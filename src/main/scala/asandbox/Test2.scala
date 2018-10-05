@@ -26,7 +26,7 @@ import javax.xml.bind.DatatypeConverter
 
 class EventSignature(
   val name: String,
-  val types: Seq[(String, String)]) {
+  val types: Seq[(String, String, Boolean)]) {
 
   override val toString =
     name + types.map(_._2).mkString("(", ",", ")")
@@ -44,12 +44,11 @@ class Event(
   val log: Log) {
 
   val fields =
-    sign.types
-      .zip(log.getTopics.asScala.toSeq.tail :+ log.getData)
+    (sign.types.filter(_._3) ++: sign.types.filterNot(_._3))
+      .zip(log.getTopics.asScala.toSeq.tail ++: log.getData.substring(2).grouped(64).map("0x" + _).toSeq)
       .map(_ match {
-        case ((name, "uint"), value) => (name, new BigInteger(value.substring(2), 16).toString)
-        case ((name, "uint256"), value) => (name, new BigInteger(value.substring(2), 16).toString)
-        case ((name, "address"), value) => (name, "0x" + value.substring(24).toLowerCase)
+        case ((name, "uint256", _), value) => (name, new BigInteger(value.substring(2), 16).toString)
+        case ((name, "address", _), value) => (name, "0x" + value.substring(26).toLowerCase)
       })
       .toMap
 
@@ -61,32 +60,38 @@ class Event(
 object TransferEventSignature extends EventSignature(
   "Transfer",
   Seq(
-    ("from" -> "address"),
-    ("to" -> "address"),
-    ("amout" -> "uint256")))
+    ("from", "address", true),
+    ("to", "address", true),
+    ("amount", "uint256", false)))
 
 object TicketPurchasedEventSignature extends EventSignature(
   "TicketPurchased",
   Seq(
-    ("lotAddr" -> "address"),
-    ("lotIndex" -> "uint256"),
-    ("ticketNumber" -> "uint256"),
-    ("player" -> "address"),
-    ("ticketPrice" -> "uint256")))
+    ("lotAddr", "address", false),
+    ("lotIndex", "uint256", false),
+    ("ticketNumber", "uint256", false),
+    ("player", "address", false),
+    ("ticketPrice", "uint256", false)))
 
 object TicketWinEventSignature extends EventSignature(
   "TicketWin",
   Seq(
-    ("lotAddr" -> "address"),
-    ("lotIndex" -> "uint256"),
-    ("ticketNumber" -> "uint256"),
-    ("player" -> "address"),
-    ("win" -> "uint256")))
+    ("lotAddr", "address", false),
+    ("lotIndex", "uint256", false),
+    ("ticketNumber", "uint256", false),
+    ("player", "address", false),
+    ("win", "uint256", false)))
 
 class TransferEvent(override val log: Log)
   extends Event(
     TransferEventSignature,
     log) {
+
+  val to = fields("to")
+
+  val from = fields("to")
+
+  val amount = fields("amount")
 
 }
 
@@ -95,12 +100,32 @@ class TicketWinEvent(override val log: Log)
     TicketWinEventSignature,
     log) {
 
+  val lotAddr = fields("lotAddr")
+
+  val lotIndex = fields("lotIndex")
+
+  val ticketNumber = fields("ticketNumber")
+
+  val player = fields("player")
+
+  val ticketPrice = fields("ticketPrice")
+
 }
 
 class TicketPurchasedEvent(override val log: Log)
   extends Event(
     TicketPurchasedEventSignature,
     log) {
+
+  val lotAddr = fields("lotAddr")
+
+  val lotIndex = fields("lotIndex")
+
+  val ticketNumber = fields("ticketNumber")
+
+  val player = fields("player")
+
+  val ticketPrice = fields("ticketPrice")
 
 }
 
@@ -120,11 +145,11 @@ object EventFactory {
 
 object Test2 extends App {
 
-  val targetAddr = "0x2D3E7D4870a51b918919E7B851FE19983E4c38d5"
+  val targetAddr = "0x0a919A4480183B33ED516aF57619808AEdCfdB6E"
 
-  val fromBlock = 6456336
+  val fromBlock = 4177376
 
-  val service = new HttpService("https://mainnet.infura.io/.....")
+  val service = new HttpService("https://ropsten.infura.io/....")
 
   val web3 = org.web3j.protocol.Web3j.build(service)
 
@@ -152,9 +177,8 @@ object Test2 extends App {
 
     logs.foreach { log =>
       val logObject = log.get.asInstanceOf[Log]
-      val t = EventFactory.apply(logObject)
-      println(t)
-      println(logObject.getType)
+      val event = EventFactory.apply(logObject)
+      println(event)
     }
 
   }
