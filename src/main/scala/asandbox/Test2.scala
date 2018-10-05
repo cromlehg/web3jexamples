@@ -132,14 +132,12 @@ class TicketPurchasedEvent(override val log: Log)
 object EventFactory {
 
   def apply(log: Log): Option[Event] =
-    if (TransferEventSignature.logMatch(log))
-      Some(new TransferEvent(log))
-    else if (TicketPurchasedEventSignature.logMatch(log))
-      Some(new TicketPurchasedEvent(log))
-    else if (TicketWinEventSignature.logMatch(log))
-      Some(new TicketWinEvent(log))
-    else
-      None
+    log.getTopics.get(0) match {
+      case TransferEventSignature.sign => Some(new TransferEvent(log))
+      case TicketPurchasedEventSignature.sign => Some(new TicketPurchasedEvent(log))
+      case TicketWinEventSignature.sign => Some(new TicketWinEvent(log))
+      case _ => None
+    }
 
 }
 
@@ -165,15 +163,6 @@ object Test2 extends App {
 
     val logs = result.getLogs.asScala.toSeq
     println("Count " + logs.length)
-
-    // topcis:
-    // 0. Keccak-256 hash of transfer(uint256,uint256)
-    // 1. from
-    // 2. to
-    // 3. data[0] = amount
-    //
-    //
-    //
 
     logs.foreach { log =>
       val logObject = log.get.asInstanceOf[Log]
