@@ -108,7 +108,7 @@ class TicketWinEvent(override val log: Log)
 
   val player = fields("player")
 
-  val ticketPrice = fields("ticketPrice")
+  val win = fields("win")
 
 }
 
